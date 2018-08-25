@@ -1,0 +1,165 @@
+---
+title: "Comorbidity package"
+author: "David Henderson"
+date: "24 August 2018"
+output: 
+  html_document:
+    theme: spacelab
+    code_folding: hide
+    toc: true
+    toc_float: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+
+#Introduction
+
+A quick play with the `comorbidity` package to see the difference in Charlson and Elixhauser scores when using full and truncated ICD10 codes. 
+
+##Packages
+
+```{r lib}
+library(comorbidity)
+library(tidyverse)
+library(magrittr)
+```
+
+##Initialise dataframes
+
+The package lets you make dummy data really easily. I'm going to make 30,000 observations of 5000 indiviudals (differing numbers of disease) then create a copy dataset with ICD10 codes truncated to 3 characters.
+
+```{r df}
+#Full data
+data_full_code <- data.frame(
+  id = sample(1:5000, size = 30000, replace = TRUE),
+  code = sample_diag(n = 30000, version = "ICD10_2011"),
+  stringsAsFactors = FALSE
+)
+
+data_full_code %<>%
+  arrange(id)
+#Truncated data
+data_truncated <-
+  data_full_code %>% 
+  mutate(code = strtrim(code, 3))
+
+data_full_code
+data_truncated
+```
+
+#Calculate Charlson Index
+
+Now run the `comorbidity()` function to create Charlson scores for both datasets.
+
+```{r ch}
+charlson_full <- comorbidity(data_full_code, id = "id", code = "code", score = "charlson_icd10")
+charlson_trunc <- comorbidity(data_truncated, id = "id", code = "code", score = "charlson_icd10")
+charlson_full
+charlson_trunc
+```
+
+Are they the same
+
+```{r check}
+identical(charlson_full, charlson_trunc)
+```
+
+
+Of course not, how different?
+
+##Visualise
+
+Scores for full data
+
+```{r viz}
+charlson_full %>% 
+  ggplot(aes(score)) +
+  geom_bar()
+```
+
+...and truncated data. Slight drops in higher scores and increases in lower/zero scores as expected but not a huge difference
+
+```{r viz_2}
+charlson_trunc %>% 
+  ggplot(aes(score)) +
+  geom_bar()
+```
+
+The `comorbidity()` function also calculates a weighted score which increases scores for certain diseases (e.g. diabetes with complications). I'd expect to see a bigger difference here...
+
+```{r we_ch}
+charlson_full %>% 
+  ggplot(aes(wscore)) +
+  geom_bar()
+```
+
+truncated data...
+
+```{r trunc_weight}
+charlson_trunc %>% 
+  ggplot(aes(wscore)) +
+  geom_bar()
+```
+
+This holds up surprisingly well...
+
+#Elixhauser
+
+Repeat for elixhauser
+
+```{r elix}
+elix_full <- comorbidity(data_full_code, id = "id", code = "code", score = "elixhauser_icd10")
+elix_trunc <- comorbidity(data_truncated, id = "id", code = "code", score = "elixhauser_icd10")
+elix_full
+elix_trunc
+```
+
+##Visualise
+
+Full codes
+
+```{r elix_1}
+elix_full %>% 
+  ggplot(aes(score)) +
+  geom_bar()
+```
+
+Truncated
+
+```{r trunc}
+elix_trunc %>% 
+  ggplot(aes(score)) +
+  geom_bar()
+```
+
+Again, the same pattern where there are more zero and 1 scores and fewer higher scores. Again this is a very mild change though. 
+
+Weighted score full data
+
+```{r elix_wh}
+elix_full %>% 
+  ggplot(aes(wscore)) +
+  geom_bar()
+```
+
+truncated
+
+```{r trunc_elix_we}
+elix_trunc %>% 
+  ggplot(aes(wscore)) +
+  geom_bar()
+```
+
+Again holds up better than expected.
+
+Of course - this is dummy data and difficult to know how well this would work in the real world!
+
+#session_info
+
+```{r session}
+devtools::session_info()
+```
